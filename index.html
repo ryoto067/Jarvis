@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>J.A.R.V.I.S.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --c: #4fd8ff;
+    --c2: #1a8fb8;
+    --dim: rgba(79, 216, 255, 0.35);
+    --faint: rgba(79, 216, 255, 0.12);
+    --warn: #ffb547;
+    --bg: #02070c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--c); font-family: 'Share Tech Mono', monospace; }
+  body::before { /* グリッド */
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background-image: linear-gradient(var(--faint) 1px, transparent 1px), linear-gradient(90deg, var(--faint) 1px, transparent 1px);
+    background-size: 40px 40px; opacity: .35;
+    mask-image: radial-gradient(circle at center, #000 30%, transparent 85%);
+  }
+  body::after { /* 走査線 */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px);
+  }
+  #reactor { position: fixed; inset: 0; width: 100%; height: 100%; }
+
+  header { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; z-index: 5; }
+  .title { font-family: 'Orbitron', sans-serif; font-weight: 800; letter-spacing: .5em; font-size: 15px; text-shadow: 0 0 12px var(--c); }
+  .title small { display: block; font-family: 'Share Tech Mono'; font-weight: 400; letter-spacing: .2em; font-size: 10px; color: var(--dim); margin-top: 4px; }
+  #status { font-family: 'Orbitron'; font-size: 12px; letter-spacing: .3em; padding: 8px 16px; border: 1px solid var(--dim); position: relative; }
+  #status::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 10px; box-shadow: 0 0 8px currentColor; animation: blink 1.2s infinite; }
+  #status.awake { color: #fff; border-color: var(--c); box-shadow: 0 0 18px var(--dim) inset; }
+  #status.speaking { color: var(--warn); border-color: var(--warn); }
+  @keyframes blink { 50% { opacity: .2; } }
+
+  .panel { position: fixed; z-index: 5; width: 270px; padding: 16px 18px; border: 1px solid var(--faint); background: linear-gradient(180deg, rgba(4,20,32,.7), rgba(2,8,14,.5)); backdrop-filter: blur(2px); }
+  .panel::before, .panel::after { content: ""; position: absolute; width: 14px; height: 14px; border: 2px solid var(--c); }
+  .panel::before { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+  .panel::after { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+  .panel h3 { font-family: 'Orbitron'; font-size: 10px; letter-spacing: .35em; color: var(--dim); margin-bottom: 12px; display: flex; justify-content: space-between; }
+  #left { left: 28px; top: 90px; }
+  #right { right: 28px; top: 90px; bottom: 200px; display: flex; flex-direction: column; }
+
+  .clock { font-family: 'Orbitron'; font-size: 34px; font-weight: 600; text-shadow: 0 0 14px var(--c); }
+  .date { font-size: 12px; color: var(--dim); margin: 4px 0 16px; letter-spacing: .15em; }
+  .row { display: flex; justify-content: space-between; font-size: 12px; margin: 7px 0; }
+  .row span:first-child { color: var(--dim); }
+  .bar { height: 4px; background: var(--faint); margin: 3px 0 10px; position: relative; overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--c); box-shadow: 0 0 8px var(--c); width: 0; transition: width .08s linear; }
+  .ctrl { margin-top: 14px; font-size: 11px; color: var(--dim); }
+  .ctrl input[type=range] { width: 100%; accent-color: var(--c); }
+  .ctrl select { width: 100%; background: #031420; color: var(--c); border: 1px solid var(--dim); padding: 4px; font-family: inherit; font-size: 11px; margin-top: 4px; }
+
+  #log { flex: 1; overflow-y: auto; font-size: 12px; line-height: 1.6; scrollbar-width: thin; scrollbar-color: var(--dim) transparent; }
+  #log div { margin-bottom: 8px; animation: fadeIn .3s; }
+  #log .t { color: var(--dim); font-size: 10px; margin-right: 6px; }
+  #log .you { color: #e6faff; }
+  #log .ai { color: var(--c); }
+  #log .sys { color: var(--warn); font-size: 11px; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(6px); } }
+
+  #wave { position: fixed; left: 0; right: 0; bottom: 70px; height: 110px; width: 100%; z-index: 4; }
+  #caption { position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%); z-index: 6; font-size: 18px; text-align: center; max-width: 60vw; min-height: 1.4em; color: #e6faff; text-shadow: 0 0 10px var(--c); }
+  footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 10px; padding: 18px; z-index: 6; }
+  #cmd { width: min(520px, 60vw); background: rgba(3,20,32,.8); border: 1px solid var(--dim); color: var(--c); padding: 10px 14px; font-family: inherit; font-size: 14px; outline: none; }
+  #cmd:focus { border-color: var(--c); box-shadow: 0 0 12px var(--dim); }
+  footer button { background: transparent; border: 1px solid var(--dim); color: var(--c); padding: 0 18px; font-family: 'Orbitron'; font-size: 11px; letter-spacing: .2em; cursor: pointer; }
+  footer button:hover { background: var(--faint); }
+
+  #boot { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: radial-gradient(circle, #04161f 0%, #010407 70%); }
+  #boot button { width: 220px; height: 220px; border-radius: 50%; background: transparent; border: 2px solid var(--c); color: var(--c); font-family: 'Orbitron'; font-size: 14px; letter-spacing: .35em; cursor: pointer; box-shadow: 0 0 40px var(--dim), 0 0 30px var(--dim) inset; animation: pulse 2s infinite; position: relative; }
+  #boot button::before { content: ""; position: absolute; inset: -16px; border-radius: 50%; border: 1px dashed var(--dim); animation: spin 12s linear infinite; }
+  #boot p { position: absolute; bottom: 12%; width: 100%; text-align: center; font-size: 12px; color: var(--dim); letter-spacing: .15em; line-height: 2; }
+  @keyframes pulse { 50% { box-shadow: 0 0 70px var(--c), 0 0 40px var(--dim) inset; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 900px) { .panel { display: none; } #caption { max-width: 90vw; } }
+</style>
+</head>
+<body>
+
+<canvas id="reactor"></canvas>
+<canvas id="wave"></canvas>
+
+<header>
+  <div class="title">J.A.R.V.I.S.<small>JUST A RATHER VERY INTELLIGENT SYSTEM</small></div>
+  <div id="status">OFFLINE</div>
+</header>
+
+<section class="panel" id="left">
+  <h3><span>SYSTEM</span><span>v0.1</span></h3>
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="date" id="date">----</div>
+  <div class="row"><span>MIC INPUT</span><span id="micVal">0 dB</span></div>
+  <div class="bar"><i id="micBar"></i></div>
+  <div class="row"><span>CORE LOAD</span><span id="cpuVal">0%</span></div>
+  <div class="bar"><i id="cpuBar"></i></div>
+  <div class="row"><span>CLAP DETECT</span><span id="clapVal">—</span></div>
+  <div class="row"><span>VOICE ENGINE</span><span id="srVal">—</span></div>
+  <div class="row"><span>AI CORE</span><span id="aiVal">—</span></div>
+  <div class="row"><span>WAKE WORD</span><span>「ジャービス」</span></div>
+  <div class="ctrl">拍手の感度 <span id="sensVal"></span>
+    <input type="range" id="sens" min="1" max="10" value="6">
+  </div>
+  <div class="ctrl">音声
+    <select id="voiceSel"></select>
+  </div>
+</section>
+
+<section class="panel" id="right">
+  <h3><span>COMM LOG</span><span id="logCount">00</span></h3>
+  <div id="log"></div>
+</section>
+
+<div id="caption"></div>
+
+<footer>
+  <input id="cmd" placeholder="ここに入力しても話しかけられます（例：今何時？）" autocomplete="off">
+  <button id="sendBtn">SEND</button>
+</footer>
+
+<div id="boot">
+  <button id="bootBtn">INITIALIZE</button>
+  <p>クリックでシステム起動（マイクの使用を「許可」してください）<br>
+  起動後：手を2回パンパン ／「ジャービス」「Hi ジャービス」「Hey ジャービス」「ねえねえジャービス」「おいジャービス」などで呼び出し<br>
+  終わるとき：「おやすみ」「以上」「ありがとう」「バイバイ」「もういいよ」など</p>
+</div>
+
+<script>
+/* ============ 基本 ============ */
+const $ = id => document.getElementById(id);
+const cv = $('reactor'), ctx = cv.getContext('2d');
+const wv = $('wave'), wctx = wv.getContext('2d');
+let W, H, DPR;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  wv.width = W * DPR; wv.height = 110 * DPR; wctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+let state = 'offline'; // offline | standby | awake | thinking | speaking
+let awakeTimer = null;
+let analyser = null, freqData, timeData;
+let level = 0;            // 0..1 マイク音量（平滑化）
+let speakEnergy = 0;      // 発話中の擬似エネルギー
+const N = 60;             // 半周あたりのバー数（左右対称で120本）
+const bars = new Float32Array(N), peaks = new Float32Array(N);
+const bursts = [];        // 拍手・起動時の波紋
+
+function setState(s) {
+  state = s;
+  const el = $('status');
+  el.className = s;
+  el.textContent = { offline: 'OFFLINE', standby: 'STANDBY', awake: 'LISTENING', thinking: 'PROCESSING', speaking: 'RESPONDING' }[s];
+}
+
+/* ============ ログ ============ */
+let logN = 0;
+function log(text, cls) {
+  const d = document.createElement('div');
+  const now = new Date();
+  d.innerHTML = `<span class="t">${now.toTimeString().slice(0, 8)}</span><span class="${cls}"></span>`;
+  d.lastChild.textContent = (cls === 'you' ? '▸ ' : cls === 'ai' ? '◂ ' : '// ') + text;
+  if (cls === 'ai') lastAiText = text;
+  $('log').appendChild(d);
+  $('log').scrollTop = 1e9;
+  $('logCount').textContent = String(++logN).padStart(2, '0');
+}
+
+/* ============ 効果音（機械的なビープ） ============ */
+let actx;
+function beep(freqs = [880, 1320], dur = 0.07) {
+  if (!actx) return;
+  freqs.forEach((f, i) => {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    const t = actx.currentTime + i * (dur + 0.03);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  });
+}
+
+/* ============ 音声合成（ジャービスの声） ============ */
+// 声の候補：VOICEVOX（PC内の音声エンジン）＋ブラウザ/Windows の声
+let voices = [], voice = null;   // ブラウザの声
+let vvSpeakers = [], vvSpeaker = null; // VOICEVOX の声（style id）
+const DEFAULT_VV = /青山龍星/;   // 低く落ち着いた男性の声を初期値に
+function loadVoices() {
+  voices = speechSynthesis.getVoices().filter(v => /ja/i.test(v.lang));
+  const sel = $('voiceSel');
+  sel.innerHTML = '';
+  const add = (value, label, group) => { const o = document.createElement('option'); o.value = value; o.textContent = label; group.appendChild(o); };
+  if (vvSpeakers.length) {
+    const g = document.createElement('optgroup'); g.label = 'VOICEVOX';
+    vvSpeakers.forEach(s => add('vv:' + s.id, `${s.name}（${s.style}）`, g));
+    sel.appendChild(g);
+  }
+  const g2 = document.createElement('optgroup'); g2.label = 'Windows / ブラウザ';
+  voices.forEach((v, i) => add('web:' + i, v.name, g2));
+  sel.appendChild(g2);
+
+  // 前回選んだ声 → VOICEVOX の青山龍星 → Windows の男性の声 の順で選ぶ
+  const saved = localStorage.getItem('jarvisVoice');
+  const vvDefault = vvSpeakers.find(s => DEFAULT_VV.test(s.name) && s.style === 'ノーマル') || vvSpeakers[0];
+  const male = voices.findIndex(v => /keita|ichiro|daichi|naoki|otoya|male|男性/i.test(v.name));
+  const pick = [saved, vvDefault && 'vv:' + vvDefault.id, voices.length && 'web:' + Math.max(male, 0)]
+    .find(v => v && [...sel.options].some(o => o.value === v));
+  if (pick) { sel.value = pick; applyVoice(pick); }
+  $('srVal').textContent = vvSpeakers.length ? 'VOICEVOX' : voices.length ? 'OK' : 'NO JA VOICE';
+}
+function applyVoice(value) {
+  if (value.startsWith('vv:')) { vvSpeaker = +value.slice(3); voice = null; }
+  else { vvSpeaker = null; voice = voices[+value.slice(4)] || null; }
+}
+async function loadVoicevox() {
+  try {
+    const r = await fetch('/api/voices');
+    if (r.ok) vvSpeakers = await r.json();
+  } catch (_) { vvSpeakers = []; }
+  loadVoices();
+}
+speechSynthesis.onvoiceschanged = loadVoices; loadVoices();
+$('voiceSel').onchange = e => { applyVoice(e.target.value); localStorage.setItem('jarvisVoice', e.target.value); speak('音声を切り替えました。'); };
+
+// VOICEVOX で音声を作る（届いた文から先に作っておき、話し終えたらすぐ次を流す）
+function synthVoicevox(text, speaker) {
+  return fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, speaker }) })
+    .then(r => { if (!r.ok) throw new Error('TTS ' + r.status); return r.arrayBuffer(); })
+    .then(ab => actx.decodeAudioData(ab));
+}
+let outAnalyser = null, outFreq, outTime, currentSource = null, vvPlaying = false;
+function playBuffer(buf, done) {
+  if (!outAnalyser) {
+    outAnalyser = actx.createAnalyser();
+    outAnalyser.fftSize = 2048; outAnalyser.smoothingTimeConstant = 0.6;
+    outAnalyser.minDecibels = -90; outAnalyser.maxDecibels = -20;
+    outAnalyser.connect(actx.destination);
+    outFreq = new Uint8Array(outAnalyser.frequencyBinCount);
+    outTime = new Float32Array(outAnalyser.fftSize);
+  }
+  const src = actx.createBufferSource();
+  src.buffer = buf;
+  src.connect(outAnalyser); // 実際の声を解析して円や波形を動かす
+  src.onended = () => { if (currentSource === src) { currentSource = null; vvPlaying = false; } done(); };
+  currentSource = src; vvPlaying = true;
+  src.start();
+}
+function speakBrowser(text, done) {
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ja-JP';
+  if (voice) u.voice = voice;
+  const isMale = voice && /keita|ichiro|daichi|naoki|otoya|male|男性/i.test(voice.name);
+  u.pitch = isMale ? 0.85 : 0.55; // 低め・落ち着いたトーンに
+  u.rate = 1.05;
+  u.onboundary = () => { speakEnergy = 1; };
+  u.onend = u.onerror = done;
+  speechSynthesis.speak(u);
+}
+
+// 読み上げキュー：Claude の返事を一文ずつ受け取り、届いた順に話す
+let speechGen = 0, speechQueue = [], uttering = false, streamOpen = false, afterAll = null;
+function cleanForSpeech(s) {
+  return s.replace(/\[\[[^\]]*\]\]/g, '').replace(/https?:\/\/\S+/g, '').replace(/[*#`_>|]/g, '').trim();
+}
+function pump() {
+  if (uttering) return;
+  const s = speechQueue.shift();
+  if (s) {
+    uttering = true;
+    const g = speechGen;
+    const done = () => {
+      if (g !== speechGen) return;
+      uttering = false;
+      ignoreUntil = performance.now() + 600;
+      pump();
+    };
+    setState('speaking');
+    $('caption').textContent = s.text;
+    if (s.audio) {
+      // VOICEVOX が使えなければ Windows の声で代わりに話す
+      s.audio.then(buf => { if (g === speechGen) playBuffer(buf, done); })
+             .catch(() => { if (g === speechGen) speakBrowser(s.text, done); });
+    } else speakBrowser(s.text, done);
+    return;
+  }
+  if (streamOpen) { setState('thinking'); return; } // 続きの文がまだ届いていない（作業中）
+  speakEnergy = 0;
+  $('caption').textContent = '';
+  const cb = afterAll; afterAll = null;
+  if (cb) cb(); else goAwake();
+}
+function say(text) {
+  text = cleanForSpeech(text);
+  if (!text) return;
+  const item = { text };
+  if (vvSpeaker !== null && actx) { item.audio = synthVoicevox(text, vvSpeaker); item.audio.catch(() => {}); }
+  speechQueue.push(item);
+  pump();
+}
+function beginSpeech(after) {
+  speechGen++; speechSynthesis.cancel();
+  if (currentSource) { const s = currentSource; currentSource = null; vvPlaying = false; try { s.stop(); } catch (_) {} }
+  speechQueue = []; uttering = false; streamOpen = false; afterAll = after || null;
+}
+function speak(text, after) { beginSpeech(after); log(text, 'ai'); say(text); }
+
+/* ============ 状態遷移 ============ */
+function goAwake() {
+  setState('awake');
+  clearTimeout(awakeTimer);
+  // オーナーが「終了」と言うまでスタンバイには戻らない（自動タイムアウトなし）
+}
+const GREETINGS = ['はい、お呼びでしょうか。', 'お待ちしておりました。ご用件をどうぞ。', 'システム起動完了。何なりとお申し付けください。', 'はい、こちらに。'];
+function wake(by) {
+  if (state === 'speaking') return;
+  if (state === 'thinking') { log('作業中です（止めるときは「ジャービス、中止」）', 'sys'); return; }
+  bursts.push({ t: performance.now(), strong: true });
+  beep([660, 990, 1480], 0.06);
+  log(`起動トリガー: ${by}`, 'sys');
+  speak(GREETINGS[Math.floor(Math.random() * GREETINGS.length)]);
+}
+
+/* ============ Claude との会話 ============ */
+// 会話の流れは Claude Code 側が覚えている（INITIALIZE を押すと新しい会話になる）
+let aiOnline = false, chatTurn = 0;
+const ACTION = /\[\[(OPEN|SLEEP)(?::([^\]]+))?\]\]/g;
+const CANCEL_WORDS = /中止|ストップ|キャンセル|止めて|やめて/;
+
+// 作業中に使っている道具を、ログに分かりやすい名前で出す
+function toolLabel(name) {
+  const mcp = name.match(/^mcp__(?:claude_ai_)?([^_]+(?:_[A-Z][a-z]+)*)__(.+)$/);
+  if (mcp) return `${mcp[1].replace(/_/g, ' ')}（${mcp[2]}）`;
+  return ({ Bash: 'コマンド実行', PowerShell: 'コマンド実行', Read: 'ファイルを読む', Write: 'ファイルを書く', Edit: 'ファイルを編集',
+    Grep: '中身を検索', Glob: 'ファイルを探す', WebSearch: 'ウェブ検索', WebFetch: 'ページを読む', Agent: '専門エージェントに依頼',
+    Skill: 'スキルを使う', ToolSearch: '道具を準備' })[name] || name;
+}
+
+async function respond(text) {
+  log(text, 'you');
+  if (state !== 'thinking' && isFarewell(text)) return farewell();
+  setState('thinking');
+  clearTimeout(awakeTimer);
+  if (!aiOnline) return localRespond(text);
+
+  const myTurn = ++chatTurn;
+  const stamp = new Date().toLocaleString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  let full = '', buf = '', failed = false, saidWait = false;
+  beginSpeech();
+  streamOpen = true;
+
+  // 「。」「！」「？」や改行が来たら、その文までを先に読み上げる
+  // 検索したときに末尾へ付く「Sources:（出典一覧）」以降は読み上げない
+  let muted = false;
+  const flush = (final) => {
+    const re = final ? /[\s\S]+/g : /[^。！？!?\n]*[。！？!?\n]+/g;
+    let m, last = 0;
+    while ((m = re.exec(buf))) {
+      if (/^\s*(Sources|出典)\s*[:：]/i.test(m[0])) muted = true;
+      if (!muted) say(m[0]);
+      last = re.lastIndex;
+    }
+    buf = buf.slice(last);
+  };
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: `（${stamp}）${text}` }),
+    });
+    if (res.status === 503) { aiOnline = false; $('aiVal').textContent = 'OFFLINE'; throw new Error('APIキーが未設定です'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let pending = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (myTurn !== chatTurn) { reader.cancel(); return; } // 割り込まれた
+      if (done) break;
+      pending += dec.decode(value, { stream: true });
+      const lines = pending.split('\n'); pending = lines.pop();
+      for (const line of lines) {
+        if (!line) continue;
+        const msg = JSON.parse(line);
+        if (msg.error) throw new Error(msg.error);
+        if (msg.tool) {
+          log('⚙ ' + toolLabel(msg.tool), 'sys');
+          // 何も言わずに作業が始まったら、ひとこと断ってから待つ
+          if (!full.trim() && !saidWait) { saidWait = true; say('少々お待ちください。'); }
+        }
+        if (msg.text) { full += msg.text; buf += msg.text; flush(false); }
+      }
+    }
+    flush(true);
+  } catch (err) {
+    if (myTurn !== chatTurn) return;
+    log('エラー: ' + err.message, 'sys');
+    if (!full) { streamOpen = false; return localRespond(text); }
+    failed = true; flush(true);
+  }
+  if (myTurn !== chatTurn) return;
+
+  // 動作タグ（ページを開く・スタンバイに戻る）
+  let after = null;
+  for (const [, kind, arg] of full.matchAll(ACTION)) {
+    if (kind === 'OPEN' && /^https?:\/\//.test(arg)) { const url = arg; after = () => { window.open(url, '_blank'); goAwake(); }; }
+    // [[SLEEP]] は無視する（スタンバイに戻るのはオーナーが「終了」と言ったときだけ）
+  }
+  const body = full.split(/\n\s*(?:Sources|出典)\s*[:：]/i)[0];
+  const spoken = body.replace(ACTION, '').trim();
+  if (spoken) log(spoken, 'ai');
+  afterAll = after;
+  streamOpen = false;
+  pump();
+}
+
+/* ============ 簡易モード（APIキーがないとき用の決まった返事） ============ */
+function localRespond(text) {
+  const now = new Date();
+  let reply = null, after = null, m;
+  const t = text.replace(/\s/g, '');
+
+  if (/何時|時間|時刻/.test(t)) reply = `現在の時刻は、${now.getHours()}時${now.getMinutes()}分です。`;
+  else if (/何日|日付|曜日|今日は/.test(t)) reply = `本日は${now.getMonth() + 1}月${now.getDate()}日、${'日月火水木金土'[now.getDay()]}曜日です。`;
+  else if (/誰|名前|自己紹介/.test(t)) reply = '私はジャービス。あなた専属の人工知能アシスタントです。';
+  else if (/ありがと/.test(t)) reply = 'どういたしまして。お役に立てて光栄です。';
+  else if (/調子|元気|状態|ステータス/.test(t)) reply = '全システム正常に稼働しています。コア温度、問題ありません。';
+  else if (/おはよ/.test(t)) reply = 'おはようございます。今日も良い一日になりますように。';
+  else if (/こんにち|こんばん/.test(t)) reply = 'こんにちは。ご用件は何でしょうか。';
+  else if (/冗談|ジョーク|面白い/.test(t)) reply = 'あなたのスケジュール管理より簡単な仕事は、まだ見つかっていません。冗談です。';
+  else if (/ユーチューブ|youtube/i.test(t)) { reply = 'ユーチューブを開きます。'; after = () => { window.open('https://www.youtube.com', '_blank'); goAwake(); }; }
+  else if ((m = t.match(/(.+?)(を|について)?(検索|調べ)/))) {
+    const q = m[1];
+    reply = `「${q}」を検索します。`;
+    after = () => { window.open('https://www.google.com/search?q=' + encodeURIComponent(q), '_blank'); goAwake(); };
+  }
+  else if (/天気/.test(t)) { reply = '天気情報を検索します。'; after = () => { window.open('https://www.google.com/search?q=' + encodeURIComponent('天気'), '_blank'); goAwake(); }; }
+  else if (/終了/.test(t)) {
+    reply = '承知しました。スタンバイモードに移行します。';
+    after = () => { setState('standby'); };
+  }
+  else reply = '申し訳ありません。その命令はまだ学習していません。';
+
+  setTimeout(() => speak(reply, after), 350);
+}
+
+/* ============ 音声認識（ウェイクワード） ============ */
+// 呼びかけ：「ジャービス」の前に付く言葉（Hi / Hey / ねえねえ / おい / OK など。重ねてもよい）
+const WAKE_PREFIX = '(?:hi|hey|hello|ok|okay|yo|ハイ|はい|ヘイ|へい|ハロー|オッケー|おっけー|OK|おい|おーい|オーイ|ねえ|ねぇ|ねー|ネエ|なあ|なぁ|やあ|よお|ちょっと|もしもし|あの|えっと)';
+// 「ジャービス」の聞き取られ方の揺れ（ジャーヴィス、じゃあビス、チャービス、Jarvis など）
+const WAKE_NAME = '(?:jarvis|javis|jervis|jarvi|(?:じゃ|ジャ|ヂャ|チャ|ちゃ)[ーあぁアァ]?\\s?(?:ビ|び|ヴィ|ヴぃ|ベ|べ|ヴェ)[ーい]?\\s?(?:ス|す|ズ|ず))';
+const WAKE = new RegExp(`(?:${WAKE_PREFIX}[、。,.!！\\s]*)*${WAKE_NAME}(?:さん|くん|君)?[、。,.!！?？\\s]*`, 'i');
+
+// 終わりの合図（短い発言でこれらを言ったらスタンバイに戻る。Claude には送らないので即座に反応する）
+// はっきり「終わり」と分かる言葉：いつでも有効
+const FAREWELL_STRONG = [
+  '終了(?:です|して|して(?:ください|いい))?',
+];
+// 「はい」の意味にもなる言葉：ジャービスが質問した直後は、承認の返事として Claude に渡す
+const FAREWELL_SOFT = []; // 「終了」以外では終わらない
+const FILLER = '(?:じゃあ|では|うん|はい|よし|ok|オッケー|ありがとう|どうも)?';
+const TAIL = '(?:ね|よ|な|ねー|です)*';
+const mkFarewell = words => new RegExp(`^${FILLER}(?:${WAKE_NAME})?(?:${words.join('|')})(?:${WAKE_NAME})?${TAIL}$`, 'i');
+const FAREWELL_STRONG_RE = mkFarewell(FAREWELL_STRONG), FAREWELL_SOFT_RE = mkFarewell(FAREWELL_SOFT);
+const FAREWELL_LINES = ['承知しました。また何かあればお呼びください。', 'かしこまりました。いつでもお声がけください。', 'お役に立てて光栄です。スタンバイに戻ります。', 'では、失礼いたします。'];
+let lastAiText = '';
+function isFarewell(text) {
+  // 句読点・空白・記号を除き、前置きの呼びかけ（Hi ジャービス 等）を外してから判定
+  const t = text.replace(WAKE, '').replace(/[、。,.!！?？\s〜…]/g, '');
+  if (!t || t.length > 20) return false;
+  if (FAREWELL_STRONG_RE.test(t)) return true;
+  const askedQuestion = /[?？]\s*$|(?:ですか|ますか|でしょうか|ませんか)[。\s]*$/.test(lastAiText);
+  return !askedQuestion && FAREWELL_SOFT.length > 0 && FAREWELL_SOFT_RE.test(t);
+}
+function farewell() {
+  clearTimeout(awakeTimer);
+  log('終了の合図を受け付けました', 'sys');
+  beep([990, 660], 0.06);
+  speak(FAREWELL_LINES[Math.floor(Math.random() * FAREWELL_LINES.length)], () => setState('standby'));
+}
+let rec = null, ignoreUntil = 0;
+function startRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { $('srVal').textContent = '非対応'; log('このブラウザは音声認識に非対応です（Chrome か Edge を使ってください）', 'sys'); return; }
+  rec = new SR();
+  rec.lang = 'ja-JP'; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = e => {
+    if (state === 'speaking' || performance.now() < ignoreUntil) return;
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i], text = r[0].transcript.trim();
+      if (!r.isFinal) { if (state === 'awake' || WAKE.test(text)) $('caption').textContent = text; continue; }
+      $('caption').textContent = '';
+      if (state === 'thinking') {
+        // 作業中は「中止」だけ受け付ける（ほかの発言で作業を邪魔しない）
+        if (CANCEL_WORDS.test(text)) respond(text.replace(WAKE, '').trim() || text);
+        continue;
+      }
+      if (WAKE.test(text)) {
+        const rest = text.replace(WAKE, '').trim();
+        if (rest.length > 1) { bursts.push({ t: performance.now(), strong: true }); beep([660, 990], 0.05); respond(rest); }
+        else wake('音声「' + text + '」');
+      } else if (state === 'awake') {
+        respond(text);
+      }
+    }
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed') { log('マイクが許可されていません', 'sys'); rec = null; }
+  };
+  rec.onend = () => { if (rec) try { rec.start(); } catch (_) {} };
+  rec.start();
+  $('srVal').textContent = 'ONLINE';
+}
+
+/* ============ マイク・拍手検出 ============ */
+let clapTimes = [], prevRms = 0, lastSpike = 0;
+async function startMic() {
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } });
+    const src = actx.createMediaStreamSource(stream);
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.6;
+    analyser.minDecibels = -90; analyser.maxDecibels = -20;
+    src.connect(analyser);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    timeData = new Float32Array(analyser.fftSize);
+    $('clapVal').textContent = 'ARMED';
+  } catch (err) {
+    log('マイクを取得できませんでした: ' + err.message, 'sys');
+  }
+}
+
+function detectClap(rms, peak) {
+  const sens = +$('sens').value;              // 1..10
+  const th = 0.55 - sens * 0.045;             // 感度が高いほど小さい音でも反応
+  const now = performance.now();
+  // 急に大きくなった短い音 = 拍手
+  if (peak > th && rms > prevRms * 2.5 && now - lastSpike > 130) {
+    lastSpike = now;
+    clapTimes = clapTimes.filter(t => now - t < 900);
+    clapTimes.push(now);
+    bursts.push({ t: now, strong: false });
+    $('clapVal').textContent = `CLAP ×${clapTimes.length}`;
+    if (clapTimes.length >= 2 && clapTimes[1] - clapTimes[0] > 120) {
+      clapTimes = [];
+      if (state !== 'speaking' && state !== 'thinking') wake('拍手 ×2');
+    }
+  }
+  prevRms = prevRms * 0.7 + rms * 0.3;
+}
+
+/* ============ 描画 ============ */
+const TAU = Math.PI * 2;
+function frame(now) {
+  const t = now / 1000;
+  let rms = 0, peak = 0;
+
+  if (analyser) {
+    analyser.getByteFrequencyData(freqData);
+    analyser.getFloatTimeDomainData(timeData);
+    for (let i = 0; i < timeData.length; i++) { const v = timeData[i]; rms += v * v; if (Math.abs(v) > peak) peak = Math.abs(v); }
+    rms = Math.sqrt(rms / timeData.length);
+    if (state !== 'speaking' && state !== 'offline') detectClap(rms, peak);
+  }
+  level += (Math.min(1, rms * 6) - level) * 0.25;
+
+  // VOICEVOX で話しているときは、実際の声を解析して動かす
+  const realOut = state === 'speaking' && vvPlaying && outAnalyser;
+  if (realOut) {
+    outAnalyser.getByteFrequencyData(outFreq);
+    outAnalyser.getFloatTimeDomainData(outTime);
+    let o = 0; for (let i = 0; i < outTime.length; i++) o += outTime[i] * outTime[i];
+    speakEnergy += (Math.min(1, Math.sqrt(o / outTime.length) * 5) - speakEnergy) * 0.3;
+  } else if (state === 'speaking') speakEnergy = Math.max(0.35, speakEnergy * 0.94 + (Math.random() - 0.5) * 0.08);
+
+  // バーの値を更新（周波数 → 円周）
+  for (let i = 0; i < N; i++) {
+    let v = 0;
+    const bin = Math.floor(2 + Math.pow(i / N, 1.5) * 220);
+    if (realOut) {
+      v = Math.max(0, (outFreq[bin] / 255 - 0.15) / 0.85);
+    } else if (state === 'speaking') {
+      v = speakEnergy * (0.35 + 0.65 * Math.abs(Math.sin(t * 9 + i * 0.45) * Math.sin(t * 3.7 + i * 0.13))) * (1 - i / N * 0.5);
+    } else if (analyser) {
+      v = Math.max(0, (freqData[bin] / 255 - 0.15) / 0.85);
+    }
+    bars[i] = Math.max(v, bars[i] * 0.86);
+    peaks[i] = Math.max(bars[i], peaks[i] - 0.012);
+  }
+
+  // UI数値
+  $('micBar').style.width = (level * 100) + '%';
+  $('micVal').textContent = (rms > 0 ? Math.round(20 * Math.log10(rms)) : -99) + ' dB';
+  const cpu = 18 + Math.sin(t * 0.7) * 6 + level * 50 + (state === 'speaking' ? 25 : 0);
+  $('cpuBar').style.width = cpu + '%'; $('cpuVal').textContent = Math.round(cpu) + '%';
+
+  drawReactor(t, now);
+  drawWave(t);
+  requestAnimationFrame(frame);
+}
+
+function drawReactor(t, now) {
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2 - 30;
+  const R = Math.min(W, H) * 0.17;
+  const active = state === 'awake' || state === 'speaking' || state === 'thinking';
+  const C = (a) => `rgba(79,216,255,${a})`;
+  const energy = state === 'speaking' ? speakEnergy : level;
+
+  // 背景グロー
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 3);
+  g.addColorStop(0, C(0.10 + energy * 0.15)); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.shadowColor = '#4fd8ff';
+
+  // 最外周：目盛りリング（360° のスケール）
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 180; i++) {
+    const a = i / 180 * TAU + t * 0.03;
+    const long = i % 15 === 0, mid = i % 5 === 0;
+    const r1 = R * 2.05, r2 = r1 + (long ? 14 : mid ? 8 : 4);
+    ctx.strokeStyle = C(long ? 0.8 : 0.3);
+    ctx.beginPath(); ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1); ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2); ctx.stroke();
+  }
+  ctx.font = '9px "Share Tech Mono"'; ctx.fillStyle = C(0.5); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * TAU + t * 0.03, r = R * 2.05 + 26;
+    ctx.fillText(String(i * 30).padStart(3, '0'), Math.cos(a) * r, Math.sin(a) * r);
+  }
+
+  // 外側の回転アーク
+  arcs(R * 1.85, 2, -t * 0.25, [[0, 0.7], [1.2, 1.9], [3.3, 4.6]], C(0.55));
+  arcs(R * 1.78, 1, t * 0.4, [[0.3, 0.5], [2.1, 2.4], [4.0, 4.2], [5.2, 5.9]], C(0.35));
+
+  // 音に反応する放射状バー（ピッピッピッ）
+  const base = R * 1.15, maxLen = R * 0.6;
+  ctx.lineCap = 'round';
+  for (let side = 0; side < 2; side++) {
+    for (let i = 0; i < N; i++) {
+      const frac = (i + 0.5) / N * 0.5;
+      const a = -Math.PI / 2 + (side ? -1 : 1) * frac * TAU;
+      const v = bars[i], len = 3 + v * maxLen;
+      const cs = Math.cos(a), sn = Math.sin(a);
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = v > 0.2 ? 12 : 0;
+      ctx.strokeStyle = v > 0.75 ? `rgba(255,255,255,${0.6 + v * 0.4})` : C(0.25 + v * 0.75);
+      ctx.beginPath(); ctx.moveTo(cs * base, sn * base); ctx.lineTo(cs * (base + len), sn * (base + len)); ctx.stroke();
+      // ピークのドット
+      const pr = base + 3 + peaks[i] * maxLen + 6;
+      ctx.shadowBlur = 0; ctx.fillStyle = C(0.3 + peaks[i] * 0.7);
+      ctx.fillRect(cs * pr - 1.2, sn * pr - 1.2, 2.4, 2.4);
+    }
+  }
+  ctx.shadowBlur = 0;
+
+  // 中間リング
+  ctx.strokeStyle = C(0.7); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, R * 1.05, 0, TAU); ctx.stroke();
+  ctx.setLineDash([2, 6]); ctx.lineWidth = 6; ctx.strokeStyle = C(0.35);
+  ctx.save(); ctx.rotate(-t * 0.6); ctx.beginPath(); ctx.arc(0, 0, R * 0.93, 0, TAU); ctx.stroke(); ctx.restore();
+  ctx.setLineDash([]);
+
+  // セグメントリング（アークリアクター風）
+  const segs = 12;
+  for (let i = 0; i < segs; i++) {
+    const a0 = i / segs * TAU + t * (active ? 0.8 : 0.15), a1 = a0 + TAU / segs * 0.62;
+    ctx.strokeStyle = C(active ? 0.85 : 0.45); ctx.lineWidth = R * 0.09;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.74, a0, a1); ctx.stroke();
+  }
+  ctx.strokeStyle = C(0.4); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.62, 0, TAU); ctx.stroke();
+
+  // コア
+  const coreR = R * (0.5 + energy * 0.12);
+  const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR);
+  cg.addColorStop(0, `rgba(230,250,255,${0.55 + energy * 0.45})`);
+  cg.addColorStop(0.35, C(0.35 + energy * 0.4));
+  cg.addColorStop(1, 'rgba(79,216,255,0)');
+  ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, 0, coreR, 0, TAU); ctx.fill();
+
+  // 中央テキスト
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = '#e6faff'; ctx.font = `600 ${Math.round(R * 0.16)}px Orbitron`;
+  ctx.fillText('J.A.R.V.I.S', 0, -4);
+  ctx.font = `${Math.round(R * 0.09)}px "Share Tech Mono"`; ctx.fillStyle = C(0.8);
+  ctx.fillText($('status').textContent, 0, R * 0.17);
+  ctx.shadowBlur = 0;
+
+  // 波紋（拍手・起動）
+  for (let i = bursts.length - 1; i >= 0; i--) {
+    const b = bursts[i], p = (now - b.t) / (b.strong ? 1100 : 600);
+    if (p >= 1) { bursts.splice(i, 1); continue; }
+    ctx.strokeStyle = C((1 - p) * (b.strong ? 0.9 : 0.6)); ctx.lineWidth = b.strong ? 3 : 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, R * (1.05 + p * (b.strong ? 1.6 : 0.8)), 0, TAU); ctx.stroke();
+  }
+
+  // 走査ライン（回転するレーダー）
+  if (active) {
+    const a = t * 2.2;
+    const sg = ctx.createConicGradient ? ctx.createConicGradient(a - 0.6, 0, 0) : null;
+    if (sg) {
+      sg.addColorStop(0, 'rgba(79,216,255,0)'); sg.addColorStop(0.095, C(0.18)); sg.addColorStop(0.1, 'rgba(79,216,255,0)');
+      ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, R * 2.0, 0, TAU); ctx.arc(0, 0, R * 1.1, 0, TAU, true); ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // 四隅のブラケット
+  ctx.strokeStyle = C(0.5); ctx.lineWidth = 1.5;
+  const bx = R * 2.6, by = R * 2.35;
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => {
+    ctx.beginPath();
+    ctx.moveTo(cx + sx * bx, cy + sy * (by - 24)); ctx.lineTo(cx + sx * bx, cy + sy * by); ctx.lineTo(cx + sx * (bx - 24), cy + sy * by);
+    ctx.stroke();
+  });
+}
+
+function arcs(r, w, rot, list, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = w;
+  list.forEach(([a, b]) => { ctx.beginPath(); ctx.arc(0, 0, r, a + rot, b + rot); ctx.stroke(); });
+}
+
+function drawWave(t) {
+  const h = 110, mid = h / 2;
+  wctx.clearRect(0, 0, W, h);
+  // 目盛り
+  wctx.strokeStyle = 'rgba(79,216,255,0.12)'; wctx.lineWidth = 1;
+  wctx.beginPath(); wctx.moveTo(0, mid); wctx.lineTo(W, mid); wctx.stroke();
+  for (let x = 0; x < W; x += 20) { wctx.beginPath(); wctx.moveTo(x, mid - (x % 100 ? 2 : 6)); wctx.lineTo(x, mid + (x % 100 ? 2 : 6)); wctx.stroke(); }
+
+  const samples = 512;
+  const draw = (alpha, width, blur, gain) => {
+    wctx.strokeStyle = `rgba(79,216,255,${alpha})`; wctx.lineWidth = width; wctx.shadowColor = '#4fd8ff'; wctx.shadowBlur = blur;
+    wctx.beginPath();
+    for (let i = 0; i < samples; i++) {
+      const x = i / (samples - 1) * W;
+      const edge = Math.sin(i / (samples - 1) * Math.PI); // 端を絞る
+      let v = 0;
+      if (state === 'speaking' && vvPlaying && outTime) {
+        v = outTime[Math.floor(i / samples * outTime.length)] * 3;
+      } else if (state === 'speaking') {
+        v = speakEnergy * 0.5 * (Math.sin(i * 0.09 + t * 14) * 0.6 + Math.sin(i * 0.23 - t * 9) * 0.3 + Math.sin(i * 0.031 + t * 3) * 0.4);
+      } else if (timeData) {
+        v = timeData[Math.floor(i / samples * timeData.length)] * 4;
+      }
+      const y = mid + Math.max(-1, Math.min(1, v * gain)) * edge * (mid - 4);
+      i ? wctx.lineTo(x, y) : wctx.moveTo(x, y);
+    }
+    wctx.stroke();
+  };
+  draw(0.25, 4, 18, 1);
+  draw(0.95, 1.5, 6, 1);
+  wctx.shadowBlur = 0;
+}
+
+/* ============ 時計 ============ */
+setInterval(() => {
+  const d = new Date();
+  $('clock').textContent = d.toTimeString().slice(0, 8);
+  $('date').textContent = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}  ${['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()]}`;
+}, 250);
+$('sens').oninput = e => $('sensVal').textContent = e.target.value;
+$('sensVal').textContent = $('sens').value;
+
+/* ============ 入力欄 ============ */
+function sendTyped() {
+  const v = $('cmd').value.trim(); if (!v) return;
+  $('cmd').value = '';
+  const rest = v.replace(WAKE, '').trim();
+  if (state === 'thinking' && !CANCEL_WORDS.test(v)) { log('作業中です（止めるときは「中止」と入力）', 'sys'); return; }
+  if (!rest) wake('テキスト入力'); else respond(rest);
+}
+$('sendBtn').onclick = sendTyped;
+$('cmd').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) sendTyped(); };
+
+/* ============ 起動 ============ */
+requestAnimationFrame(frame);
+$('bootBtn').onclick = async () => {
+  $('boot').style.transition = 'opacity .8s'; $('boot').style.opacity = 0;
+  setTimeout(() => $('boot').remove(), 800);
+  await startMic();
+  startRecognition();
+  await loadVoicevox();
+  beep([440, 660, 880, 1320], 0.08);
+  bursts.push({ t: performance.now(), strong: true });
+  const h = new Date().getHours();
+  const hello = h < 11 ? 'おはようございます' : h < 18 ? 'こんにちは' : 'こんばんは';
+  try { aiOnline = (await (await fetch('/api/status')).json()).ai; } catch (_) { aiOnline = false; }
+  if (aiOnline) fetch('/api/reset', { method: 'POST' }); // 新しい会話として始める
+  $('aiVal').textContent = aiOnline ? 'CLAUDE ONLINE' : 'OFFLINE';
+  log(aiOnline ? '全システム起動（Claude 接続済み）' : '全システム起動（APIキー未設定のため簡易モード）', 'sys');
+  // 秘書モード：その日はじめての起動なら、朝のブリーフィング（予定・タスク・メール）を自動で行う
+  const today = new Date().toLocaleDateString('sv'); // YYYY-MM-DD
+  const brief = aiOnline && localStorage.getItem('jarvisBriefed') !== today;
+  if (brief) {
+    speak(`システム、オンライン。${hello}。本日のブリーフィングをいたします。`, () => {
+      localStorage.setItem('jarvisBriefed', today);
+      respond('今日のブリーフィングをお願い');
+    });
+  } else {
+    speak(`システム、オンライン。${hello}。ご用の際は、手を二回叩くか、ジャービスとお呼びください。`, () => setState('standby'));
+  }
+};
+</script>
+</body>
+</html>
